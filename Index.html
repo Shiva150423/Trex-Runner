@@ -1,0 +1,63 @@
+<!doctype html>a
+const bgm = new THREE.Audio(listener); audioLoader.load('assets/bgm.mp3', b=>{ bgm.setBuffer(b); bgm.setLoop(true); bgm.setVolume(0.5); try{ bgm.play(); }catch(e){} });
+const sfxJump = new THREE.Audio(listener); audioLoader.load('assets/jump.wav', b=> sfxJump.setBuffer(b));
+const sfxCoin = new THREE.Audio(listener); audioLoader.load('assets/coin.wav', b=> sfxCoin.setBuffer(b));
+const sfxGameOver = new THREE.Audio(listener); audioLoader.load('assets/gameover.wav', b=> sfxGameOver.setBuffer(b));
+
+
+// State
+let velocityY = 0; let onGround = true; let score = 0; let speed = 0.12; let gameOver = false;
+
+
+// Controls
+function jump(){ if (onGround && !gameOver){ velocityY = 0.26; onGround=false; if (sfxJump.isBuffer) try{ sfxJump.play(); }catch(e){} } }
+function moveLeft(){ currentLane = Math.max(0, currentLane-1); }
+function moveRight(){ currentLane = Math.min(2, currentLane+1); }
+window.addEventListener('keydown', e=>{ if (e.code==='Space'){ e.preventDefault(); jump(); } if (e.code==='ArrowLeft') moveLeft(); if (e.code==='ArrowRight') moveRight(); if (e.code==='KeyR') restart(); });
+
+
+// Touch handling (tap/swipe)
+let tsx=null; window.addEventListener('touchstart', e=>{ tsx = e.touches[0].clientX }); window.addEventListener('touchend', e=>{ const ex=(e.changedTouches&&e.changedTouches[0]&&e.changedTouches[0].clientX)||0; if (tsx===null){ jump(); return; } const dx = ex-tsx; if (dx>50) moveRight(); else if (dx<-50) moveLeft(); else jump(); tsx=null; });
+
+
+// Collisions
+function checkCollisions(){ if (!trexModel) return; const px = player.position.x; const py = player.position.y; for (let i=obstacles.length-1;i>=0;i--){ const o = obstacles[i]; if (Math.abs(o.position.z - 0) < 1.2 && Math.abs(o.position.x - px) < 1.6 && Math.abs(py - o.position.y) < 1.8){ gameOver = true; if (bgm.isPlaying) bgm.stop(); if (sfxGameOver.isBuffer) try{ sfxGameOver.play(); }catch(e){} setTimeout(()=>alert('Game Over! Score: '+score), 80); return; } } for (let i=coins.length-1;i>=0;i--){ const c = coins[i]; if (Math.abs(c.position.z - 0) < 1.2 && Math.abs(c.position.x - px) < 1.6 && Math.abs(player.position.y - c.position.y) < 1.4){ scene.remove(c); coins.splice(i,1); score+=10; if (sfxCoin.isBuffer) try{ sfxCoin.play(); }catch(e){} } } }
+
+
+// Spawn logic and animate loop
+let spawnTimer=0; let coinTimer=0; const clock = new THREE.Clock();
+function animate(){ const dt = clock.getDelta(); spawnTimer += dt*1000; coinTimer += dt*1000; if (spawnTimer > Math.max(600 - score*2, 250)){ if (Math.random()<0.7) createObstacle(Math.floor(Math.random()*3)); else createCoin(Math.floor(Math.random()*3)); spawnTimer=0; } if (coinTimer > 700){ if (Math.random()>0.5) createCoin(Math.floor(Math.random()*3)); coinTimer=0; }
+
+
+// move world forward (objects Z position increases toward camera)
+for (let i=obstacles.length-1;i>=0;i--){ obstacles[i].position.z += speed*60; if (obstacles[i].position.z > 20){ scene.remove(obstacles[i]); obstacles.splice(i,1); score += 1; } }
+for (let i=coins.length-1;i>=0;i--){ coins[i].position.z += speed*60; if (coins[i].position.z > 20){ scene.remove(coins[i]); coins.splice(i,1); } }
+
+
+// update player lane smoothly
+const targetX = lanes[currentLane]; player.position.x += (targetX - player.position.x) * 0.2;
+// jump physics
+if (!onGround){ velocityY -= 0.01; player.position.y += velocityY; if (player.position.y <= 1.0){ player.position.y = 1.0; onGround = true; velocityY = 0; } }
+
+
+// bob animation
+player.rotation.y = Math.sin(performance.now()*0.002)*0.04;
+
+
+if (!gameOver) checkCollisions(); if (!gameOver) speed += 0.0006; scoreEl.textContent = 'Score: ' + score;
+
+
+composer.render(); requestAnimationFrame(animate);
+}
+animate();
+
+
+function restart(){ obstacles.forEach(o=>scene.remove(o)); obstacles.length=0; coins.forEach(c=>scene.remove(c)); coins.length=0; score=0; speed=0.12; gameOver=false; onGround=true; velocityY=0; currentLane=1; player.position.set(lanes[currentLane],1.0,0); try{ if (bgm.isPlaying) bgm.stop(); bgm.play(); }catch(e){} }
+
+
+window.addEventListener('resize', ()=>{ camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight); });
+
+
+</script>
+</body>
+</html>
